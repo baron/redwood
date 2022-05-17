@@ -1,13 +1,10 @@
-use tmux_interface::TmuxCommand;
+use tmux_interface::{NewSession, SwitchClient};
 
 use crate::error::RedwoodError;
 use crate::Result;
 
 pub fn new_session(session_name: &str, start_directory: &str) -> Result<()> {
-    let tmux = TmuxCommand::new();
-
-    if let Err(e) = tmux
-        .new_session()
+    if let Err(e) = NewSession::new()
         .detached()
         .session_name(session_name)
         .start_directory(start_directory)
@@ -27,9 +24,7 @@ pub fn new_session_attached(session_name: &str, start_directory: &str) -> Result
 }
 
 fn switch_session(session_name: &str) -> Result<()> {
-    let tmux = TmuxCommand::new();
-
-    return match tmux.switch_client().target_session(session_name).output() {
+    return match SwitchClient::new().target_session(session_name).output() {
         Ok(_) => Ok(()),
         Err(e) => Err(RedwoodError::TmuxError(e.to_string())),
     };
