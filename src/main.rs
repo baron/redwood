@@ -34,6 +34,7 @@ fn main() {
         } => new(cfg, worktree_name, repo_path),
         Commands::Open { worktree_name } => open(cfg, worktree_name),
         Commands::Delete { worktree_name } => delete(cfg, worktree_name),
+        Commands::Import { worktree_path } => import(cfg, worktree_path),
         Commands::List {} => list(cfg),
         Commands::Version {} => version(),
     } {
@@ -103,6 +104,31 @@ fn delete(mut cfg: conf::Config, worktree_name: String) -> Result<()> {
     cfg.write()?;
 
     tmux::kill_session(&worktree_name)?;
+
+    return Ok(());
+}
+
+fn import(mut cfg: conf::Config, worktree_path: String) -> Result<()> {
+    let path = Path::new(&worktree_path);
+    let path = match path.canonicalize() {
+        Ok(path) => path,
+        Err(err) => {
+            return Err(RedwoodError::InvalidPathError {
+                worktree_path,
+                msg: err.to_string(),
+            })
+        }
+    };
+
+    let worktree_path = Path::new(&worktree_path);
+    let worktree_name = path.iter().last().unwrap().to_str().unwrap();
+
+    let repo = git::open_repo(&worktree_path)?;
+    git::find_worktree(&repo, worktree_name)?;
+
+    let wt_cfg = conf::WorktreeConfig::new(path.to_str().unwrap(), worktree_name);
+    cfg.add_worktree(wt_cfg)?;
+    cfg.write()?;
 
     return Ok(());
 }

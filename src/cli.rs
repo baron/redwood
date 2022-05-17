@@ -24,6 +24,10 @@ pub enum Commands {
         #[clap(required = true)]
         worktree_name: String,
     },
+    Import {
+        #[clap(required = true)]
+        worktree_path: String,
+    },
     List {},
     Version {},
 }

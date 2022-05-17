@@ -63,3 +63,10 @@ pub fn prune_worktree(repo: &Repository, worktree_name: &str) -> Result<()> {
 
     Ok(())
 }
+
+pub fn find_worktree(repo: &Repository, worktree_name: &str) -> Result<git2::Worktree> {
+    match repo.find_worktree(worktree_name) {
+        Ok(wt) => Ok(wt),
+        Err(err) => return Err(RedwoodError::from(err)),
+    }
+}

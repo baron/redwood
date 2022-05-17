@@ -36,6 +36,12 @@ redwood list
 redwood delete <worktree_name>
 ```
 
+### Import worktree
+
+```shell
+redwood import <path_to_worktree>
+```
+
 ## Installation
 
 ```shell

@@ -21,6 +21,10 @@ pub enum RedwoodError {
         message: String,
     },
     TmuxError(String),
+    InvalidPathError {
+        worktree_path: String,
+        msg: String,
+    },
 }
 
 impl fmt::Display for RedwoodError {
@@ -61,6 +65,9 @@ impl fmt::Display for RedwoodError {
             }
             ConfigPathUnresolvable => {
                 write!(f, "could not resolve path to config variable (make sure $XDG_CONFIG_HOME or $HOME is set)")
+            }
+            InvalidPathError { worktree_path, msg } => {
+                write!(f, "invalid path {}: {}", worktree_path, msg)
             }
         }
     }
