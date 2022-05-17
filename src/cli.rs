@@ -25,4 +25,5 @@ pub enum Commands {
         worktree_name: String,
     },
     List {},
+    Version {},
 }

@@ -11,6 +11,9 @@ use crate::cli::{Cli, Commands};
 use crate::error::RedwoodError;
 use clap::Parser;
 
+const PKG_NAME: &str = env!("CARGO_PKG_NAME");
+const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub type Result<T> = std::result::Result<T, RedwoodError>;
 
 fn main() {
@@ -32,6 +35,7 @@ fn main() {
         Commands::Open { worktree_name } => open(cfg, worktree_name),
         Commands::Delete { worktree_name } => delete(cfg, worktree_name),
         Commands::List {} => list(cfg),
+        Commands::Version {} => version(),
     } {
         print!("{}", e);
         exit(1);
@@ -101,4 +105,9 @@ fn delete(mut cfg: conf::Config, worktree_name: String) -> Result<()> {
     tmux::kill_session(&worktree_name)?;
 
     return Ok(());
+}
+
+fn version() -> Result<()> {
+    println!("{} v{}", PKG_NAME, PKG_VERSION);
+    Ok(())
 }
