@@ -1,4 +1,4 @@
-use tmux_interface::{NewSession, SwitchClient};
+use tmux_interface::{KillSession, NewSession, SwitchClient};
 
 use crate::error::RedwoodError;
 use crate::Result;
@@ -25,6 +25,13 @@ pub fn new_session_attached(session_name: &str, start_directory: &str) -> Result
 
 fn switch_session(session_name: &str) -> Result<()> {
     return match SwitchClient::new().target_session(session_name).output() {
+        Ok(_) => Ok(()),
+        Err(e) => Err(RedwoodError::TmuxError(e.to_string())),
+    };
+}
+
+pub fn kill_session(session_name: &str) -> Result<()> {
+    return match KillSession::new().target_session(session_name).output() {
         Ok(_) => Ok(()),
         Err(e) => Err(RedwoodError::TmuxError(e.to_string())),
     };

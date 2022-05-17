@@ -97,5 +97,7 @@ fn delete(mut cfg: conf::Config, worktree_name: String) -> Result<()> {
     cfg.remove_worktree(&worktree_name)?;
     cfg.write()?;
 
+    tmux::kill_session(&worktree_name)?;
+
     return Ok(());
 }
