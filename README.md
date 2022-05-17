@@ -9,14 +9,14 @@ later recreate the session inside the worktree.
 ### Create new session
 
 ```shell
-redwood new <path_to_git_repo> <worktree_name>
+redwood new <worktree_name> [path_to_git_repo]
 ```
-
-`path_to_git_repo` resolves to the root of the git directory in which it
-exists. Using `.` is allowed.
 
 `worktree_name` is used as the name for both the worktree, branch and tmux
 session.
+
+`path_to_git_repo` resolves to the root of the git directory in which it
+exists. `.` is used as default.
 
 ### Open previous session
 

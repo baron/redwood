@@ -28,7 +28,7 @@ fn main() {
         Commands::New {
             repo_path,
             worktree_name,
-        } => new(cfg, repo_path, worktree_name),
+        } => new(cfg, worktree_name, repo_path),
         Commands::Open { worktree_name } => open(cfg, worktree_name),
         Commands::Delete { worktree_name } => delete(cfg, worktree_name),
         Commands::List {} => list(cfg),
@@ -38,7 +38,8 @@ fn main() {
     }
 }
 
-fn new(mut cfg: conf::Config, repo_path: String, worktree_name: String) -> Result<()> {
+fn new(mut cfg: conf::Config, worktree_name: String, repo_path: Option<String>) -> Result<()> {
+    let repo_path = repo_path.unwrap_or(String::from("."));
     let repo = git::open_repo(Path::new(&repo_path))?;
     let repo_root = git::get_repo_root(&repo);
     let worktree_path = repo_root.join(&worktree_name);

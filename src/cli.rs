@@ -12,9 +12,9 @@ pub enum Commands {
     #[clap(arg_required_else_help = true)]
     New {
         #[clap(required = true)]
-        repo_path: String,
-        #[clap(required = true)]
         worktree_name: String,
+        #[clap(required = false)]
+        repo_path: Option<String>,
     },
     Open {
         #[clap(required = true)]
