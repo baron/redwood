@@ -4,7 +4,7 @@ mod error;
 mod git;
 mod tmux;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 
 use crate::cli::{Cli, Commands};
@@ -34,7 +34,7 @@ fn main() {
         } => new(cfg, worktree_name, repo_path),
         Commands::Open { worktree_name } => open(cfg, worktree_name),
         Commands::Delete { worktree_name } => delete(cfg, worktree_name),
-        Commands::Import { worktree_path } => import(cfg, worktree_path),
+        Commands::Import { worktree_path } => import(cfg, &worktree_path),
         Commands::List {} => list(cfg),
         Commands::Version {} => version(),
     } {
@@ -43,9 +43,9 @@ fn main() {
     }
 }
 
-fn new(mut cfg: conf::Config, worktree_name: String, repo_path: Option<String>) -> Result<()> {
-    let repo_path = repo_path.unwrap_or(String::from("."));
-    let repo = git::open_repo(Path::new(&repo_path))?;
+fn new(mut cfg: conf::Config, worktree_name: String, repo_path: Option<PathBuf>) -> Result<()> {
+    let repo_path = repo_path.unwrap_or(PathBuf::from("."));
+    let repo = git::open_repo(&repo_path)?;
     let repo_root = git::get_repo_root(&repo);
     let worktree_path = repo_root.join(&worktree_name);
 
@@ -108,19 +108,17 @@ fn delete(mut cfg: conf::Config, worktree_name: String) -> Result<()> {
     return Ok(());
 }
 
-fn import(mut cfg: conf::Config, worktree_path: String) -> Result<()> {
-    let path = Path::new(&worktree_path);
-    let path = match path.canonicalize() {
+fn import(mut cfg: conf::Config, worktree_path: &Path) -> Result<()> {
+    let path = match worktree_path.canonicalize() {
         Ok(path) => path,
         Err(err) => {
             return Err(RedwoodError::InvalidPathError {
-                worktree_path,
+                worktree_path: worktree_path.to_path_buf(),
                 msg: err.to_string(),
             })
         }
     };
 
-    let worktree_path = Path::new(&worktree_path);
     let worktree_name = path.iter().last().unwrap().to_str().unwrap();
 
     let repo = git::open_repo(&worktree_path)?;

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -14,8 +16,8 @@ pub enum Commands {
     New {
         #[clap(required = true)]
         worktree_name: String,
-        #[clap(required = false)]
-        repo_path: Option<String>,
+        #[clap(required = false, parse(from_os_str))]
+        repo_path: Option<PathBuf>,
     },
     /// Open existing worktree configuration
     Open {
@@ -29,8 +31,8 @@ pub enum Commands {
     },
     /// Import existing worktree
     Import {
-        #[clap(required = true)]
-        worktree_path: String,
+        #[clap(required = true, parse(from_os_str))]
+        worktree_path: PathBuf,
     },
     /// List existing worktree configurations
     List {},
