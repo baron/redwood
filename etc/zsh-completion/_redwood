@@ -1,0 +1,32 @@
+#compdef redwood
+
+_redwood(){
+	local curcontext="$curcontext" state line
+
+  _arguments -C \
+    '1:command:(delete help import list new open version)' \
+    '*::arg:->args'
+
+  case $line[1] in
+    delete) _rw_delete ;;
+    open) _rw_open ;;
+  esac
+}
+
+_rw_open() {
+  _arguments -C \
+    "1:configs:_rw_worktree_configurations" 
+}
+
+_rw_delete() {
+  _arguments -C \
+    "1:configs:_rw_worktree_configurations" 
+}
+
+_rw_worktree_configurations(){
+  local -a configs
+  configs=(${(f)"$(_call_program redwood redwood list)"})
+  _describe 'select worktree configuration' configs
+}
+
+_redwood "$@"
