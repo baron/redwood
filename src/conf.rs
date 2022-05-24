@@ -25,11 +25,7 @@ impl Config {
     }
 
     pub fn remove_worktree(&mut self, worktree_name: &str) -> Result<()> {
-        let cfg_index = match self
-            .worktrees()
-            .iter()
-            .position(|wt| wt.worktree_name() == worktree_name)
-        {
+        let (cfg_index, _) = match self.find(worktree_name) {
             Some(index) => index,
             None => {
                 return Err(WorkTreeConfigNotFound {
@@ -60,6 +56,13 @@ impl Config {
 
     pub fn worktrees(&self) -> &Vec<WorktreeConfig> {
         return &self.worktrees;
+    }
+
+    pub fn find(&self, identifier: &str) -> Option<(usize, &WorktreeConfig)> {
+        self.worktrees
+            .iter()
+            .enumerate()
+            .find(|(_, wt)| identifier == wt.repo_path() || identifier == wt.worktree_name())
     }
 }
 

@@ -22,12 +22,12 @@ pub enum Commands {
     /// Open existing worktree configuration
     Open {
         #[clap(required = true)]
-        worktree_name: String,
+        identifier: String,
     },
     /// Delete worktree configuration
     Delete {
         #[clap(required = true)]
-        worktree_name: String,
+        identifier: String,
     },
     /// Import existing worktree
     Import {

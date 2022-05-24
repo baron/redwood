@@ -32,8 +32,8 @@ fn main() {
             repo_path,
             worktree_name,
         } => new(cfg, worktree_name, repo_path),
-        Commands::Open { worktree_name } => open(cfg, worktree_name),
-        Commands::Delete { worktree_name } => delete(cfg, worktree_name),
+        Commands::Open { identifier } => open(cfg, &identifier),
+        Commands::Delete { identifier } => delete(cfg, &identifier),
         Commands::Import { worktree_path } => import(cfg, &worktree_path),
         Commands::List {} => list(cfg),
         Commands::Version {} => version(),
@@ -73,37 +73,37 @@ fn list(cfg: conf::Config) -> Result<()> {
     return Ok(());
 }
 
-fn open(cfg: conf::Config, worktree_name: String) -> Result<()> {
-    let worktree_cfg = match cfg
-        .worktrees()
-        .iter()
-        .find(|wt| wt.worktree_name() == worktree_name)
-    {
+fn open(cfg: conf::Config, identifier: &str) -> Result<()> {
+    let (_, worktree_cfg) = match cfg.find(identifier) {
         Some(cfg) => cfg,
-        None => return Err(RedwoodError::WorkTreeConfigNotFound { worktree_name }),
+        None => {
+            return Err(RedwoodError::WorkTreeConfigNotFound {
+                worktree_name: identifier.to_string(),
+            })
+        }
     };
 
-    return tmux::new_session_attached(&worktree_name, worktree_cfg.repo_path());
+    return tmux::new_session_attached(worktree_cfg.worktree_name(), worktree_cfg.repo_path());
 }
 
-fn delete(mut cfg: conf::Config, worktree_name: String) -> Result<()> {
-    let worktree_cfg = match cfg
-        .worktrees()
-        .iter()
-        .find(|wt| wt.worktree_name() == worktree_name)
-    {
+fn delete(mut cfg: conf::Config, identifier: &str) -> Result<()> {
+    let (_, worktree_cfg) = match cfg.find(identifier) {
         Some(cfg) => cfg,
-        None => return Err(RedwoodError::WorkTreeConfigNotFound { worktree_name }),
+        None => {
+            return Err(RedwoodError::WorkTreeConfigNotFound {
+                worktree_name: identifier.to_string(),
+            })
+        }
     };
 
     let repo = git::open_repo(Path::new(worktree_cfg.repo_path()))?;
 
-    git::prune_worktree(&repo, &worktree_name)?;
+    git::prune_worktree(&repo, &worktree_cfg.worktree_name())?;
 
-    cfg.remove_worktree(&worktree_name)?;
+    tmux::kill_session(&worktree_cfg.worktree_name())?;
+
+    cfg.remove_worktree(&identifier)?;
     cfg.write()?;
-
-    tmux::kill_session(&worktree_name)?;
 
     return Ok(());
 }
