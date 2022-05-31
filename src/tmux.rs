@@ -1,4 +1,6 @@
-use tmux_interface::{KillSession, NewSession, SwitchClient};
+use tmux_interface::{AttachSession, KillSession, NewSession, SwitchClient};
+
+use std::env;
 
 use crate::error::RedwoodError;
 use crate::Result;
@@ -16,10 +18,14 @@ pub fn new_session(session_name: &str, start_directory: &str) -> Result<()> {
 }
 
 pub fn new_session_attached(session_name: &str, start_directory: &str) -> Result<()> {
-    // Directly attaching to the session does not seem to work when creating it from inside another
-    // tmux session, so create it detached and then switch to it instead.
     new_session(session_name, start_directory)?;
-    switch_session(session_name)?;
+    if in_tmux_session() {
+        // Directly attaching to the session does not seem to work when creating it from inside another
+        // tmux session, so create it detached and then switch to it instead.
+        switch_session(session_name)?;
+    } else {
+        attach_session(session_name)?;
+    }
     Ok(())
 }
 
@@ -30,9 +36,20 @@ fn switch_session(session_name: &str) -> Result<()> {
     };
 }
 
+fn attach_session(session_name: &str) -> Result<()> {
+    return match AttachSession::new().target_session(session_name).output() {
+        Ok(_) => Ok(()),
+        Err(e) => Err(RedwoodError::TmuxError(e.to_string())),
+    };
+}
+
 pub fn kill_session(session_name: &str) -> Result<()> {
     return match KillSession::new().target_session(session_name).output() {
         Ok(_) => Ok(()),
         Err(e) => Err(RedwoodError::TmuxError(e.to_string())),
     };
+}
+
+fn in_tmux_session() -> bool {
+    env::var_os("TMUX").is_some()
 }
