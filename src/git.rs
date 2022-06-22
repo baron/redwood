@@ -15,7 +15,16 @@ pub fn create_worktree(repo_path: &Path, worktree_name: &str) -> Result<()> {
     // This means that using redwood to create, then delete, and then recreate a worktree using the
     // same name would fail when using git2, so we invoke git directly instead for this.
     let mut cmd = std::process::Command::new("git");
-    cmd.args(["worktree", "add", worktree_path.to_str().unwrap()]);
+    cmd.args([
+        "worktree",
+        "add",
+        "-b",
+        "worktree_name",
+        worktree_path.to_str().unwrap(),
+    ]);
+    if repo.is_bare() {
+        cmd.arg("origin/main");
+    }
     return match cmd.output() {
         Ok(_) => Ok(()),
         Err(e) => Err(RedwoodError::CommandError {
