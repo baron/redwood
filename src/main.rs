@@ -97,8 +97,9 @@ fn delete(mut cfg: conf::Config, identifier: &str) -> Result<()> {
     };
 
     let repo = git::open_repo(Path::new(worktree_cfg.repo_path()))?;
-
-    git::prune_worktree(&repo, &worktree_cfg.worktree_name())?;
+    if repo.is_bare() {
+        git::prune_worktree(&repo, &worktree_cfg.worktree_name())?;
+    }
 
     tmux::kill_session(&worktree_cfg.worktree_name())?;
 
@@ -119,10 +120,12 @@ fn import(mut cfg: conf::Config, worktree_path: &Path) -> Result<()> {
         }
     };
 
-    let worktree_name = path.iter().last().unwrap().to_str().unwrap();
-
     let repo = git::open_repo(&worktree_path)?;
-    git::find_worktree(&repo, worktree_name)?;
+
+    let worktree_name = path.iter().last().unwrap().to_str().unwrap();
+    if repo.is_bare() {
+        git::find_worktree(&repo, worktree_name)?; // ensure the worktree exists
+    }
 
     let wt_cfg = conf::WorktreeConfig::new(path.to_str().unwrap(), worktree_name);
     cfg.add_worktree(wt_cfg)?;
