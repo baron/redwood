@@ -405,8 +405,7 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 [[package]]
 name = "tmux_interface"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "994f52fd871ec97d0c84c28fcaa717d63636ca1459c4dafb17a97114f3687ab0"
+source = "git+https://github.com/AntonGepting/tmux-interface-rs?rev=d947e2a#d947e2a7382aaeb9ca95643154aad18689d071e9"
 
 [[package]]
 name = "unicode-bidi"
