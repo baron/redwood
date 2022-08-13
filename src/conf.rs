@@ -47,8 +47,15 @@ impl Config {
             Err(msg) => return Err(ConfigWriteError(msg.to_string())),
         };
 
-        let conf_path = get_config_path()?;
-        return match std::fs::write(conf_path, contents) {
+        // Make sure that the directory exists before writing to it
+        let config_dir = get_config_dir()?;
+        if let Err(e) = std::fs::create_dir_all(&config_dir) {
+            return Err(ConfigWriteError(e.to_string()));
+        }
+
+        let config_path = get_config_path()?;
+
+        return match std::fs::write(config_path, contents) {
             Ok(()) => Ok(()),
             Err(err) => Err(ConfigWriteError(err.to_string())),
         };
@@ -110,13 +117,17 @@ pub fn read_config() -> Result<Config> {
     return Ok(config);
 }
 
-fn get_config_path() -> Result<path::PathBuf> {
-    let configs_dir_path = if let Some(path) = env::var_os("XDG_CONFIG_HOME") {
-        path::PathBuf::from(path)
+fn get_config_dir() -> Result<path::PathBuf> {
+    return if let Some(path) = env::var_os("XDG_CONFIG_HOME") {
+        Ok(path::PathBuf::from(path))
     } else if let Some(path) = env::var_os("HOME") {
-        path::PathBuf::from(path).join(".config")
+        Ok(path::PathBuf::from(path).join(".config"))
     } else {
-        return Err(ConfigPathUnresolvable);
+        Err(ConfigPathUnresolvable)
     };
-    return Ok(configs_dir_path.join("redwood").join("conf.json"));
+}
+
+fn get_config_path() -> Result<path::PathBuf> {
+    let config_path = get_config_dir()?;
+    return Ok(config_path.join("redwood.json"));
 }
