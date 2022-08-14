@@ -19,7 +19,7 @@ pub fn create_worktree(repo_path: &Path, worktree_name: &str) -> Result<()> {
         "worktree",
         "add",
         "-b",
-        "worktree_name",
+        worktree_name,
         worktree_path.to_str().unwrap(),
     ]);
     if repo.is_bare() {

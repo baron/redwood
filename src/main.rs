@@ -56,12 +56,10 @@ fn new(mut cfg: conf::Config, worktree_name: String, repo_path: Option<PathBuf>)
 
     cfg.write()?;
 
-    if let Err(RedwoodError::GitError {
-        code: git2::ErrorCode::Exists,
-        class: git2::ErrorClass::Reference,
-        ..
-    }) = git::create_worktree(&repo_root, &worktree_name)
-    {}
+    if let Err(err) = git::create_worktree(&repo_root, &worktree_name) {
+        return Err(RedwoodError::from(err));
+    }
+
 
     return tmux::new_session(&worktree_name, worktree_path.to_str().unwrap());
 }
