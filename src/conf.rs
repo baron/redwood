@@ -71,9 +71,20 @@ impl Config {
             .enumerate()
             .find(|(_, wt)| identifier == wt.repo_path() || identifier == wt.worktree_name())
     }
+
+    pub fn list(&self) -> Vec<WorktreeConfig> {
+        let mut worktrees = self.worktrees().to_vec();
+
+        worktrees.sort_by(|wt1, wt2| {
+            wt1.repo_path()
+                .to_lowercase()
+                .cmp(&wt2.repo_path().to_lowercase())
+        });
+        return worktrees;
+    }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct WorktreeConfig {
     repo_path: String,
@@ -130,4 +141,35 @@ fn get_config_dir() -> Result<path::PathBuf> {
 fn get_config_path() -> Result<path::PathBuf> {
     let config_path = get_config_dir()?;
     return Ok(config_path.join("redwood.json"));
+}
+
+mod tests {
+    #[test]
+    fn list() {
+        use crate::conf::WorktreeConfig;
+
+        let mut cfg = crate::conf::Config::new();
+        let wts = vec![
+            WorktreeConfig::new("b", "b"),
+            WorktreeConfig::new("a/b/c", "a"),
+            WorktreeConfig::new("a/b/c/d", "a"),
+            WorktreeConfig::new("a/b", "b"),
+            WorktreeConfig::new("a/b/a", "b"),
+            WorktreeConfig::new("a/b/a/e", "b"),
+            WorktreeConfig::new("a", "b"),
+        ];
+
+        for wt in wts {
+            cfg.add_worktree(wt).unwrap();
+        }
+
+        let v = cfg.list();
+        assert_eq!(v[0].repo_path(), "a");
+        assert_eq!(v[1].repo_path(), "a/b");
+        assert_eq!(v[2].repo_path(), "a/b/a");
+        assert_eq!(v[3].repo_path(), "a/b/a/e");
+        assert_eq!(v[4].repo_path(), "a/b/c");
+        assert_eq!(v[5].repo_path(), "a/b/c/d");
+        assert_eq!(v[6].repo_path(), "b");
+    }
 }

@@ -67,7 +67,7 @@ fn new(mut cfg: conf::Config, worktree_name: String, repo_path: Option<PathBuf>)
 }
 
 fn list(cfg: conf::Config) -> Result<()> {
-    for worktree in cfg.worktrees().iter() {
+    for worktree in cfg.list().iter() {
         println!("{}", worktree.repo_path());
     }
     return Ok(());
