@@ -26,7 +26,15 @@ pub fn create_worktree(repo_path: &Path, worktree_name: &str) -> Result<()> {
         cmd.arg("origin/main");
     }
     return match cmd.output() {
-        Ok(_) => Ok(()),
+        Ok(output) => {
+            if output.stderr.len() == 0 {
+                return Ok(());
+            }
+            return Err(RedwoodError::CommandError {
+                command: format!("{:?}", cmd),
+                message: String::from_utf8(output.stderr).unwrap(),
+            });
+        }
         Err(e) => Err(RedwoodError::CommandError {
             command: format!("{:?}", cmd),
             message: e.to_string(),
