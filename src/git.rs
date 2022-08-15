@@ -27,7 +27,7 @@ pub fn create_worktree(repo_path: &Path, worktree_name: &str) -> Result<()> {
     }
     return match cmd.output() {
         Ok(output) => {
-            if output.stderr.len() == 0 {
+            if output.status.success() {
                 return Ok(());
             }
             return Err(RedwoodError::CommandError {
