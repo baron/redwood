@@ -1,4 +1,3 @@
-use git2;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -8,24 +7,12 @@ pub enum RedwoodError {
     ConfigReadError(String),
     ConfigNotFound,
     ConfigPathUnresolvable,
-    WorkTreeConfigNotFound {
-        worktree_name: String,
-    },
+    WorkTreeConfigNotFound { worktree_name: String },
     WorkTreeConfigAlreadyExists,
-    GitError {
-        code: git2::ErrorCode,
-        class: git2::ErrorClass,
-        message: String,
-    },
-    CommandError {
-        command: String,
-        message: String,
-    },
+    GitError { message: String },
+    CommandError { command: String, message: String },
     TmuxError(String),
-    InvalidPathError {
-        worktree_path: PathBuf,
-        msg: String,
-    },
+    InvalidPathError { worktree_path: PathBuf, msg: String },
 }
 
 impl fmt::Display for RedwoodError {
@@ -44,16 +31,8 @@ impl fmt::Display for RedwoodError {
             WorkTreeConfigAlreadyExists => {
                 write!(f, "work tree configuration already exists")
             }
-            GitError {
-                code,
-                class,
-                message,
-            } => {
-                write!(
-                    f,
-                    "git failed with code={:?}, class={:?}, message: {}",
-                    code, class, message
-                )
+            GitError { message } => {
+                write!(f, "git failed: {}", message)
             }
             TmuxError(msg) => {
                 write!(f, "{}", msg)
@@ -70,16 +49,6 @@ impl fmt::Display for RedwoodError {
             InvalidPathError { worktree_path, msg } => {
                 write!(f, "invalid path {:?}: {}", worktree_path, msg)
             }
-        }
-    }
-}
-
-impl From<git2::Error> for RedwoodError {
-    fn from(error: git2::Error) -> Self {
-        RedwoodError::GitError {
-            code: error.code(),
-            class: error.class(),
-            message: error.message().to_owned(),
         }
     }
 }

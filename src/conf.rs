@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::path;
+use std::path::{Path, PathBuf};
 
 use crate::error::RedwoodError::*;
 use crate::Result;
@@ -9,6 +9,39 @@ use crate::Result;
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     worktrees: Vec<WorktreeConfig>,
+}
+
+pub trait ConfigWriter {
+    fn write(&self, cfg: &Config) -> Result<()>;
+}
+
+struct ConfigWriterImpl {
+    config_path: PathBuf,
+}
+
+pub fn new_writer(config_path: &Path) -> impl ConfigWriter {
+    ConfigWriterImpl {
+        config_path: config_path.to_owned(),
+    }
+}
+
+impl ConfigWriter for ConfigWriterImpl {
+    fn write(&self, cfg: &Config) -> Result<()> {
+        let contents = cfg.serialize()?;
+
+        // Make sure that the directory exists before writing to it
+        let config_dir = get_config_dir()?;
+        if let Err(e) = std::fs::create_dir_all(&config_dir) {
+            return Err(ConfigWriteError(e.to_string()));
+        }
+
+        let config_path = &self.config_path;
+
+        return match std::fs::write(config_path, contents) {
+            Ok(()) => Ok(()),
+            Err(err) => Err(ConfigWriteError(err.to_string())),
+        };
+    }
 }
 
 impl Config {
@@ -41,24 +74,12 @@ impl Config {
         Config { worktrees: vec![] }
     }
 
-    pub fn write(&self) -> Result<()> {
-        let contents = match serde_json::to_string_pretty(&self) {
-            Ok(contents) => contents,
-            Err(msg) => return Err(ConfigWriteError(msg.to_string())),
-        };
-
-        // Make sure that the directory exists before writing to it
-        let config_dir = get_config_dir()?;
-        if let Err(e) = std::fs::create_dir_all(&config_dir) {
-            return Err(ConfigWriteError(e.to_string()));
+    pub fn serialize(&self) -> Result<String> {
+        match serde_json::to_string_pretty(&self) {
+            Ok(contents) => Ok(contents),
+            Err(msg) => return Err(ConfigWriteError(msg.to_string())), // TODO: More appropriate
+                                                                       // error
         }
-
-        let config_path = get_config_path()?;
-
-        return match std::fs::write(config_path, contents) {
-            Ok(()) => Ok(()),
-            Err(err) => Err(ConfigWriteError(err.to_string())),
-        };
     }
 
     pub fn worktrees(&self) -> &Vec<WorktreeConfig> {
@@ -92,9 +113,9 @@ pub struct WorktreeConfig {
 }
 
 impl WorktreeConfig {
-    pub fn new(repo_path: &str, worktree_name: &str) -> Self {
+    pub fn new(repo_path: &Path, worktree_name: &str) -> Self {
         WorktreeConfig {
-            repo_path: String::from(repo_path),
+            repo_path: repo_path.to_string_lossy().into_owned(),
             worktree_name: String::from(worktree_name),
         }
     }
@@ -108,9 +129,8 @@ impl WorktreeConfig {
     }
 }
 
-pub fn read_config() -> Result<Config> {
-    let conf_path = get_config_path()?;
-    let content = match std::fs::read_to_string(conf_path) {
+pub fn read_config(config_path: &Path) -> Result<Config> {
+    let content = match std::fs::read_to_string(config_path) {
         Ok(content) => content,
         Err(e) => {
             return match e.kind() {
@@ -128,17 +148,17 @@ pub fn read_config() -> Result<Config> {
     return Ok(config);
 }
 
-fn get_config_dir() -> Result<path::PathBuf> {
+fn get_config_dir() -> Result<PathBuf> {
     return if let Some(path) = env::var_os("XDG_CONFIG_HOME") {
-        Ok(path::PathBuf::from(path))
+        Ok(PathBuf::from(path))
     } else if let Some(path) = env::var_os("HOME") {
-        Ok(path::PathBuf::from(path).join(".config"))
+        Ok(PathBuf::from(path).join(".config"))
     } else {
         Err(ConfigPathUnresolvable)
     };
 }
 
-fn get_config_path() -> Result<path::PathBuf> {
+pub fn get_config_path() -> Result<PathBuf> {
     let config_path = get_config_dir()?;
     return Ok(config_path.join("redwood.json"));
 }
@@ -146,17 +166,18 @@ fn get_config_path() -> Result<path::PathBuf> {
 mod tests {
     #[test]
     fn list() {
+        use super::*;
         use crate::conf::WorktreeConfig;
 
         let mut cfg = crate::conf::Config::new();
         let wts = vec![
-            WorktreeConfig::new("b", "b"),
-            WorktreeConfig::new("a/b/c", "a"),
-            WorktreeConfig::new("a/b/c/d", "a"),
-            WorktreeConfig::new("a/b", "b"),
-            WorktreeConfig::new("a/b/a", "b"),
-            WorktreeConfig::new("a/b/a/e", "b"),
-            WorktreeConfig::new("a", "b"),
+            WorktreeConfig::new(Path::new("b"), "b"),
+            WorktreeConfig::new(Path::new("a/b/c"), "a"),
+            WorktreeConfig::new(Path::new("a/b/c/d"), "a"),
+            WorktreeConfig::new(Path::new("a/b"), "b"),
+            WorktreeConfig::new(Path::new("a/b/a"), "b"),
+            WorktreeConfig::new(Path::new("a/b/a/e"), "b"),
+            WorktreeConfig::new(Path::new("a"), "b"),
         ];
 
         for wt in wts {
