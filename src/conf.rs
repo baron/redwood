@@ -5,6 +5,9 @@ use std::path::{Path, PathBuf};
 use crate::error::RedwoodError::*;
 use crate::Result;
 
+const CONFIG_DIRECTORY_NAME: &str = "redwood";
+const CONFIG_FILE_NAME: &str = "conf.json";
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
@@ -150,9 +153,11 @@ pub fn read_config(config_path: &Path) -> Result<Config> {
 
 fn get_config_dir() -> Result<PathBuf> {
     return if let Some(path) = env::var_os("XDG_CONFIG_HOME") {
-        Ok(PathBuf::from(path))
+        Ok(PathBuf::from(path).join(CONFIG_DIRECTORY_NAME))
     } else if let Some(path) = env::var_os("HOME") {
-        Ok(PathBuf::from(path).join(".config"))
+        Ok(PathBuf::from(path)
+            .join(".config")
+            .join(CONFIG_DIRECTORY_NAME))
     } else {
         Err(ConfigPathUnresolvable)
     };
@@ -160,7 +165,7 @@ fn get_config_dir() -> Result<PathBuf> {
 
 pub fn get_config_path() -> Result<PathBuf> {
     let config_path = get_config_dir()?;
-    return Ok(config_path.join("redwood.json"));
+    return Ok(config_path.join(CONFIG_FILE_NAME));
 }
 
 mod tests {
