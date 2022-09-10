@@ -47,15 +47,14 @@ impl Command for New {
         let repo = git.get_repo_meta(repo_path)?;
         let worktree_path = repo.root_path().join(&self.worktree_name);
 
-        cfg.add_worktree(WorktreeConfig::new(&worktree_path, &self.worktree_name))?;
-
-        config_writer.write(&cfg)?;
-
         if let Err(err) = git.create_worktree(repo.root_path(), &self.worktree_name) {
             return Err(RedwoodError::from(err));
         }
 
         tmux.new_session(&self.worktree_name, &worktree_path)?;
+
+        cfg.add_worktree(WorktreeConfig::new(&worktree_path, &self.worktree_name))?;
+        config_writer.write(&cfg)?;
 
         Ok(())
     }
@@ -129,6 +128,7 @@ impl Command for List {
         Ok(())
     }
 }
+
 struct Version {}
 
 impl Command for Version {
