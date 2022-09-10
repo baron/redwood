@@ -122,6 +122,20 @@ impl Git for GitImpl {
             return Err(RedwoodError::from(e));
         }
 
+        let branch = match repo.find_branch(worktree_name, git2::BranchType::Local) {
+            Ok(branch) => Some(branch),
+            Err(e) => match e.code() {
+                git2::ErrorCode::NotFound => None,
+                _ => return Err(RedwoodError::from(e)),
+            },
+        };
+
+        if let Some(mut branch) = branch {
+            if let Err(e) = branch.delete() {
+                return Err(RedwoodError::from(e));
+            }
+        }
+
         Ok(())
     }
 }
