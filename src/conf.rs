@@ -113,6 +113,8 @@ impl Config {
 pub struct WorktreeConfig {
     repo_path: String,
     worktree_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tmux_session_name: Option<String>,
 }
 
 impl WorktreeConfig {
@@ -120,6 +122,7 @@ impl WorktreeConfig {
         WorktreeConfig {
             repo_path: repo_path.to_string_lossy().into_owned(),
             worktree_name: String::from(worktree_name),
+            tmux_session_name: None,
         }
     }
 
@@ -129,6 +132,14 @@ impl WorktreeConfig {
 
     pub fn worktree_name(&self) -> &str {
         &self.worktree_name
+    }
+
+    pub fn tmux_session_name(&self) -> Option<&str> {
+        self.tmux_session_name.as_deref()
+    }
+
+    pub fn set_tmux_session_name(&mut self, name: &str) {
+        self.tmux_session_name = Some(name.to_owned())
     }
 }
 
@@ -175,15 +186,13 @@ mod tests {
         use crate::conf::WorktreeConfig;
 
         let mut cfg = crate::conf::Config::new();
-        let wts = vec![
-            WorktreeConfig::new(Path::new("b"), "b"),
-            WorktreeConfig::new(Path::new("a/b/c"), "a"),
-            WorktreeConfig::new(Path::new("a/b/c/d"), "a"),
-            WorktreeConfig::new(Path::new("a/b"), "b"),
-            WorktreeConfig::new(Path::new("a/b/a"), "b"),
-            WorktreeConfig::new(Path::new("a/b/a/e"), "b"),
-            WorktreeConfig::new(Path::new("a"), "b"),
-        ];
+
+        let wts: Vec<WorktreeConfig> =
+            vec!["b", "a/b/c", "a/b/c/d", "a/b", "a/b/a", "a/b/a/e", "a"]
+                .iter()
+                .map(|p| Path::new(p))
+                .map(|p| WorktreeConfig::new(p, ""))
+                .collect();
 
         for wt in wts {
             cfg.add_worktree(wt).unwrap();

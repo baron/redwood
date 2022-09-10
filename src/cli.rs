@@ -18,6 +18,8 @@ pub enum Commands {
         worktree_name: String,
         #[clap(required = false, parse(from_os_str))]
         repo_path: Option<PathBuf>,
+        #[clap(long)]
+        tmux_session_name: Option<String>,
     },
     /// Open existing worktree configuration
     Open {
@@ -33,6 +35,8 @@ pub enum Commands {
     Import {
         #[clap(required = true, parse(from_os_str))]
         worktree_path: PathBuf,
+        #[clap(long)]
+        tmux_session_name: Option<String>,
     },
     /// List existing worktree configurations
     List {},

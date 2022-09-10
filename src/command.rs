@@ -17,13 +17,21 @@ impl std::convert::From<Cli> for Box<dyn Command> {
             cli::Commands::New {
                 repo_path,
                 worktree_name,
+                tmux_session_name,
             } => Box::new(New {
                 repo_path,
                 worktree_name,
+                tmux_session_name,
             }),
             cli::Commands::Open { identifier } => Box::new(Open { identifier }),
             cli::Commands::Delete { identifier } => Box::new(Delete { identifier }),
-            cli::Commands::Import { worktree_path } => Box::new(Import { worktree_path }),
+            cli::Commands::Import {
+                worktree_path,
+                tmux_session_name,
+            } => Box::new(Import {
+                worktree_path,
+                tmux_session_name,
+            }),
             cli::Commands::List {} => Box::new(List {}),
             cli::Commands::Version {} => Box::new(Version {}),
         }
@@ -33,6 +41,7 @@ impl std::convert::From<Cli> for Box<dyn Command> {
 struct New {
     repo_path: Option<PathBuf>,
     worktree_name: String,
+    tmux_session_name: Option<String>,
 }
 
 impl Command for New {
@@ -51,9 +60,19 @@ impl Command for New {
             return Err(RedwoodError::from(err));
         }
 
-        tmux.new_session(&self.worktree_name, &worktree_path)?;
+        let session_name = self
+            .tmux_session_name
+            .as_deref()
+            .unwrap_or(&self.worktree_name);
 
-        cfg.add_worktree(WorktreeConfig::new(&worktree_path, &self.worktree_name))?;
+        tmux.new_session(session_name, &worktree_path)?;
+
+        let mut wt_cfg = WorktreeConfig::new(&worktree_path, &self.worktree_name);
+        if let Some(tmux_session_name) = &self.tmux_session_name {
+            wt_cfg.set_tmux_session_name(&tmux_session_name);
+        }
+
+        cfg.add_worktree(wt_cfg)?;
         config_writer.write(&cfg)?;
 
         Ok(())
@@ -76,7 +95,9 @@ impl Command for Open {
             }
         };
 
-        let session_name = worktree_cfg.worktree_name();
+        let session_name = worktree_cfg
+            .tmux_session_name()
+            .unwrap_or(worktree_cfg.worktree_name());
         tmux.new_session(session_name, Path::new(worktree_cfg.repo_path()))?;
         tmux.attach_to_session(session_name)?;
 
@@ -109,7 +130,10 @@ impl Command for Delete {
             git.delete_worktree(&repo.root_path(), &worktree_cfg.worktree_name())?;
         }
 
-        tmux.kill_session(&worktree_cfg.worktree_name())?;
+        let session_name = worktree_cfg
+            .tmux_session_name()
+            .unwrap_or(worktree_cfg.worktree_name());
+        tmux.kill_session(session_name)?;
 
         cfg.remove_worktree(&self.identifier)?;
         config_writer.write(&cfg)?;
@@ -140,6 +164,7 @@ impl Command for Version {
 
 struct Import {
     worktree_path: PathBuf,
+    tmux_session_name: Option<String>,
 }
 
 impl Command for Import {
@@ -157,7 +182,10 @@ impl Command for Import {
 
         let worktree_name = path.iter().last().unwrap().to_str().unwrap();
 
-        let wt_cfg = WorktreeConfig::new(&path, worktree_name);
+        let mut wt_cfg = WorktreeConfig::new(&path, worktree_name);
+        if let Some(tmux_session_name) = &self.tmux_session_name {
+            wt_cfg.set_tmux_session_name(&tmux_session_name);
+        }
         cfg.add_worktree(wt_cfg)?;
         config_writer.write(&cfg)?;
 
