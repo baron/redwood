@@ -79,9 +79,16 @@ impl Git for GitImpl {
             worktree_name,
             &worktree_path.to_string_lossy(),
         ]);
+
+        // check for origin/main or origin/master branch and reset to it
         if repo.is_bare() {
-            cmd.arg("origin/main");
+            if let Ok(_) = repo.find_branch("origin/main", git2::BranchType::Remote) {
+                cmd.arg("origin/main");
+            } else if let Ok(_) = repo.find_branch("origin/master", git2::BranchType::Remote) {
+                cmd.arg("origin/master");
+            }
         }
+
         return match cmd.output() {
             Ok(output) => {
                 if output.status.success() {
