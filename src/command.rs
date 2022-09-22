@@ -66,6 +66,7 @@ impl Command for New {
             .unwrap_or(&self.worktree_name);
 
         tmux.new_session(session_name, &worktree_path)?;
+        tmux.attach_to_session(session_name)?;
 
         let mut wt_cfg = WorktreeConfig::new(&worktree_path, &self.worktree_name);
         if let Some(tmux_session_name) = &self.tmux_session_name {
