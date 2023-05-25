@@ -60,6 +60,13 @@ impl Command for New {
             return Err(RedwoodError::from(err));
         }
 
+        let mut wt_cfg = WorktreeConfig::new(&worktree_path, &self.worktree_name);
+        if let Some(tmux_session_name) = &self.tmux_session_name {
+            wt_cfg.set_tmux_session_name(&tmux_session_name);
+        }
+        cfg.add_worktree(wt_cfg)?;
+        config_writer.write(&cfg)?;
+
         let session_name = self
             .tmux_session_name
             .as_deref()
@@ -67,14 +74,6 @@ impl Command for New {
 
         tmux.new_session(session_name, &worktree_path)?;
         tmux.attach_to_session(session_name)?;
-
-        let mut wt_cfg = WorktreeConfig::new(&worktree_path, &self.worktree_name);
-        if let Some(tmux_session_name) = &self.tmux_session_name {
-            wt_cfg.set_tmux_session_name(&tmux_session_name);
-        }
-
-        cfg.add_worktree(wt_cfg)?;
-        config_writer.write(&cfg)?;
 
         Ok(())
     }
