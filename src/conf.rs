@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::path::{Path, PathBuf};
 
 use crate::error::RedwoodError::*;
-use crate::Result;
+use crate::{user, Result};
 
 const CONFIG_DIRECTORY_NAME: &str = "redwood";
 const CONFIG_FILE_NAME: &str = "conf.json";
@@ -33,7 +32,7 @@ impl ConfigWriter for ConfigWriterImpl {
         let contents = cfg.serialize()?;
 
         // Make sure that the directory exists before writing to it
-        let config_dir = get_config_dir()?;
+        let config_dir = get_config_directory_path()?;
         if let Err(e) = std::fs::create_dir_all(config_dir) {
             return Err(ConfigWriteError(e.to_string()));
         }
@@ -162,21 +161,14 @@ pub fn read_config(config_path: &Path) -> Result<Config> {
     Ok(config)
 }
 
-fn get_config_dir() -> Result<PathBuf> {
-    if let Some(path) = env::var_os("XDG_CONFIG_HOME") {
-        return Ok(PathBuf::from(path).join(CONFIG_DIRECTORY_NAME));
-    }
-    if let Some(path) = env::var_os("HOME") {
-        return Ok(PathBuf::from(path)
-            .join(".config")
-            .join(CONFIG_DIRECTORY_NAME));
-    }
-    Err(ConfigPathUnresolvable)
+fn get_config_directory_path() -> Result<PathBuf> {
+    let user_config_directory = user::get_user_config_directory()?;
+    Ok(user_config_directory.join(CONFIG_DIRECTORY_NAME))
 }
 
-pub fn get_config_path() -> Result<PathBuf> {
-    let config_path = get_config_dir()?;
-    Ok(config_path.join(CONFIG_FILE_NAME))
+pub fn get_config_file_path() -> Result<PathBuf> {
+    let config_directory = get_config_directory_path()?;
+    Ok(config_directory.join(CONFIG_FILE_NAME))
 }
 
 mod tests {

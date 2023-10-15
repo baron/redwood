@@ -5,6 +5,7 @@ mod context;
 mod error;
 mod git;
 mod tmux;
+mod user;
 
 use crate::cli::Cli;
 use crate::command::Command;
@@ -23,7 +24,7 @@ pub type Result<T> = std::result::Result<T, RedwoodError>;
 fn main() {
     let cli = Cli::parse();
 
-    let config_path = match conf::get_config_path() {
+    let config_path = match conf::get_config_file_path() {
         Ok(config_path) => config_path,
         Err(e) => {
             print!("{}", e);

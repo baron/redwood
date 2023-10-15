@@ -1,5 +1,5 @@
 use crate::error::RedwoodError;
-use crate::Result;
+use crate::{user, Result};
 
 use tmux_interface::{AttachSession, KillSession, SwitchClient, TmuxCommand};
 
@@ -58,18 +58,8 @@ fn in_tmux_session() -> bool {
 }
 
 fn get_tmux_config_path() -> Result<PathBuf> {
-    let configs_dir_path = get_config_directory()?;
+    let configs_dir_path = user::get_user_config_directory()?;
     Ok(configs_dir_path.join("tmux").join(".tmux.conf"))
-}
-
-fn get_config_directory() -> Result<PathBuf> {
-    if let Some(path) = env::var_os("XDG_CONFIG_HOME") {
-        return Ok(PathBuf::from(path));
-    }
-    if let Some(path) = env::var_os("HOME") {
-        return Ok(PathBuf::from(path).join(".config"));
-    }
-    Err(RedwoodError::ConfigPathUnresolvable)
 }
 
 impl From<tmux_interface::Error> for RedwoodError {
