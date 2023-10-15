@@ -1,4 +1,4 @@
-name: Rust
+name: Review
 
 on:
   push:
@@ -10,10 +10,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  review:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
     - name: Build
