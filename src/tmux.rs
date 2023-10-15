@@ -29,7 +29,7 @@ impl Tmux for TmuxCommand<'_> {
         {
             return Err(RedwoodError::from(e));
         }
-        return Ok(());
+        Ok(())
     }
 
     fn kill_session(&self, session_name: &str) -> Result<()> {
@@ -46,10 +46,10 @@ impl Tmux for TmuxCommand<'_> {
             AttachSession::new().target_session(session_name).output()
         };
 
-        return match res {
+        match res {
             Ok(_) => Ok(()),
             Err(e) => Err(RedwoodError::from(e)),
-        };
+        }
     }
 }
 
@@ -58,14 +58,18 @@ fn in_tmux_session() -> bool {
 }
 
 fn get_tmux_config_path() -> Result<PathBuf> {
-    let configs_dir_path = if let Some(path) = env::var_os("XDG_CONFIG_HOME") {
-        PathBuf::from(path)
-    } else if let Some(path) = env::var_os("HOME") {
-        PathBuf::from(path).join(".config")
-    } else {
-        return Err(RedwoodError::ConfigPathUnresolvable);
-    };
-    return Ok(configs_dir_path.join("tmux").join(".tmux.conf"));
+    let configs_dir_path = get_config_directory()?;
+    Ok(configs_dir_path.join("tmux").join(".tmux.conf"))
+}
+
+fn get_config_directory() -> Result<PathBuf> {
+    if let Some(path) = env::var_os("XDG_CONFIG_HOME") {
+        return Ok(PathBuf::from(path));
+    }
+    if let Some(path) = env::var_os("HOME") {
+        return Ok(PathBuf::from(path).join(".config"));
+    }
+    Err(RedwoodError::ConfigPathUnresolvable)
 }
 
 impl From<tmux_interface::Error> for RedwoodError {

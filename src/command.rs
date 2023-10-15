@@ -56,13 +56,11 @@ impl Command for New {
         let repo = git.get_repo_meta(repo_path)?;
         let worktree_path = repo.root_path().join(&self.worktree_name);
 
-        if let Err(err) = git.create_worktree(repo.root_path(), &self.worktree_name) {
-            return Err(RedwoodError::from(err));
-        }
+        git.create_worktree(repo.root_path(), &self.worktree_name)?;
 
         let mut wt_cfg = WorktreeConfig::new(&worktree_path, &self.worktree_name);
         if let Some(tmux_session_name) = &self.tmux_session_name {
-            wt_cfg.set_tmux_session_name(&tmux_session_name);
+            wt_cfg.set_tmux_session_name(tmux_session_name);
         }
         cfg.add_worktree(wt_cfg)?;
         config_writer.write(&cfg)?;
@@ -127,7 +125,7 @@ impl Command for Delete {
 
         let repo = git.get_repo_meta(Path::new(worktree_cfg.repo_path()))?;
         if repo.is_bare() {
-            git.delete_worktree(&repo.root_path(), &worktree_cfg.worktree_name())?;
+            git.delete_worktree(repo.root_path(), worktree_cfg.worktree_name())?;
         }
 
         let session_name = worktree_cfg
@@ -184,7 +182,7 @@ impl Command for Import {
 
         let mut wt_cfg = WorktreeConfig::new(&path, worktree_name);
         if let Some(tmux_session_name) = &self.tmux_session_name {
-            wt_cfg.set_tmux_session_name(&tmux_session_name);
+            wt_cfg.set_tmux_session_name(tmux_session_name);
         }
         cfg.add_worktree(wt_cfg)?;
         config_writer.write(&cfg)?;

@@ -36,7 +36,7 @@ impl GitImpl {
     fn open_repo(path: &Path) -> Result<git2Repository> {
         match git2Repository::open(path) {
             Ok(repo) => Ok(repo),
-            Err(err) => return Err(RedwoodError::from(err)),
+            Err(err) => Err(RedwoodError::from(err)),
         }
     }
 
@@ -54,8 +54,7 @@ impl GitImpl {
                 .take(components.len() - 2)
                 .fold(PathBuf::new(), |path, component| path.join(component));
         }
-
-        return Ok(repo_root);
+        Ok(repo_root)
     }
 }
 
@@ -80,30 +79,28 @@ impl Git for GitImpl {
             &worktree_path.to_string_lossy(),
         ]);
 
+        let has_remote_branch =
+            |name: &str| repo.find_branch(name, git2::BranchType::Remote).is_ok();
         // check for origin/main or origin/master branch and reset to it
         if repo.is_bare() {
-            if let Ok(_) = repo.find_branch("origin/main", git2::BranchType::Remote) {
+            if has_remote_branch("origin/main") {
                 cmd.arg("origin/main");
-            } else if let Ok(_) = repo.find_branch("origin/master", git2::BranchType::Remote) {
+            } else if has_remote_branch("origin/master") {
                 cmd.arg("origin/master");
             }
         }
 
-        return match cmd.output() {
-            Ok(output) => {
-                if output.status.success() {
-                    return Ok(());
-                }
-                return Err(RedwoodError::CommandError {
-                    command: format!("{:?}", cmd),
-                    message: String::from_utf8(output.stderr).unwrap(),
-                });
-            }
+        match cmd.output() {
+            Ok(output) if output.status.success() => Ok(()),
+            Ok(output) => Err(RedwoodError::CommandError {
+                command: format!("{:?}", cmd),
+                message: String::from_utf8(output.stderr).unwrap(),
+            }),
             Err(e) => Err(RedwoodError::CommandError {
                 command: format!("{:?}", cmd),
                 message: e.to_string(),
             }),
-        };
+        }
     }
 
     fn get_repo_meta(&self, path: &Path) -> Result<RepoMeta> {

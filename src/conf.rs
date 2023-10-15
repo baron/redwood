@@ -8,7 +8,7 @@ use crate::Result;
 const CONFIG_DIRECTORY_NAME: &str = "redwood";
 const CONFIG_FILE_NAME: &str = "conf.json";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     worktrees: Vec<WorktreeConfig>,
@@ -34,30 +34,30 @@ impl ConfigWriter for ConfigWriterImpl {
 
         // Make sure that the directory exists before writing to it
         let config_dir = get_config_dir()?;
-        if let Err(e) = std::fs::create_dir_all(&config_dir) {
+        if let Err(e) = std::fs::create_dir_all(config_dir) {
             return Err(ConfigWriteError(e.to_string()));
         }
 
         let config_path = &self.config_path;
 
-        return match std::fs::write(config_path, contents) {
+        match std::fs::write(config_path, contents) {
             Ok(()) => Ok(()),
             Err(err) => Err(ConfigWriteError(err.to_string())),
-        };
+        }
     }
 }
 
 impl Config {
     pub fn add_worktree(&mut self, wt: WorktreeConfig) -> Result<()> {
-        if let Some(_) = self
+        if self
             .worktrees
             .iter()
-            .find(|&wt2| wt2.repo_path == wt.repo_path && wt2.worktree_name == wt.worktree_name)
+            .any(|wt2| wt2.repo_path == wt.repo_path && wt2.worktree_name == wt.worktree_name)
         {
             return Err(WorkTreeConfigAlreadyExists);
         }
         self.worktrees.push(wt);
-        return Ok(());
+        Ok(())
     }
 
     pub fn remove_worktree(&mut self, worktree_name: &str) -> Result<()> {
@@ -70,7 +70,7 @@ impl Config {
             }
         };
         self.worktrees.remove(cfg_index);
-        return Ok(());
+        Ok(())
     }
 
     pub fn new() -> Self {
@@ -80,13 +80,13 @@ impl Config {
     pub fn serialize(&self) -> Result<String> {
         match serde_json::to_string_pretty(&self) {
             Ok(contents) => Ok(contents),
-            Err(msg) => return Err(ConfigWriteError(msg.to_string())), // TODO: More appropriate
-                                                                       // error
+            Err(msg) => Err(ConfigWriteError(msg.to_string())), // TODO: More appropriate
+                                                                // error
         }
     }
 
     pub fn worktrees(&self) -> &Vec<WorktreeConfig> {
-        return &self.worktrees;
+        &self.worktrees
     }
 
     pub fn find(&self, identifier: &str) -> Option<(usize, &WorktreeConfig)> {
@@ -104,7 +104,7 @@ impl Config {
                 .to_lowercase()
                 .cmp(&wt2.repo_path().to_lowercase())
         });
-        return worktrees;
+        worktrees
     }
 }
 
@@ -159,24 +159,24 @@ pub fn read_config(config_path: &Path) -> Result<Config> {
         Err(msg) => panic!("deserialize config {}", msg),
     };
 
-    return Ok(config);
+    Ok(config)
 }
 
 fn get_config_dir() -> Result<PathBuf> {
-    return if let Some(path) = env::var_os("XDG_CONFIG_HOME") {
-        Ok(PathBuf::from(path).join(CONFIG_DIRECTORY_NAME))
-    } else if let Some(path) = env::var_os("HOME") {
-        Ok(PathBuf::from(path)
+    if let Some(path) = env::var_os("XDG_CONFIG_HOME") {
+        return Ok(PathBuf::from(path).join(CONFIG_DIRECTORY_NAME));
+    }
+    if let Some(path) = env::var_os("HOME") {
+        return Ok(PathBuf::from(path)
             .join(".config")
-            .join(CONFIG_DIRECTORY_NAME))
-    } else {
-        Err(ConfigPathUnresolvable)
-    };
+            .join(CONFIG_DIRECTORY_NAME));
+    }
+    Err(ConfigPathUnresolvable)
 }
 
 pub fn get_config_path() -> Result<PathBuf> {
     let config_path = get_config_dir()?;
-    return Ok(config_path.join(CONFIG_FILE_NAME));
+    Ok(config_path.join(CONFIG_FILE_NAME))
 }
 
 mod tests {
