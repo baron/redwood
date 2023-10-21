@@ -309,7 +309,7 @@ dependencies = [
 
 [[package]]
 name = "redwood"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "clap",
  "git2",
