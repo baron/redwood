@@ -6,9 +6,15 @@ later recreate the session inside the worktree.
 
 ## Installation
 
+### Build from source
+
 ```shell
 sudo make install
 ```
+
+### Pre-compiled binaries
+
+Pre-compiled binaries are available in the releases section.
 
 ## Configuration
 

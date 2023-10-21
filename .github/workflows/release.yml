@@ -1,0 +1,75 @@
+name: Release binary
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    environment: production
+
+    strategy:
+      matrix:
+        include:
+        - build: x86-64-linux
+          os: ubuntu-latest
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+        - build: x86-64-macos
+          os: macos-latest
+          toolchain: stable
+          target: x86_64-apple-darwin
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: ${{ matrix.toolchain }}
+        target: ${{ matrix.target }}
+
+    - name: Set Build Target
+      run: echo "BUILD_TARGET=${{ matrix.target }}" >> $GITHUB_ENV
+
+    - name: Build Rust binary
+      run: cargo build --release --target ${{ matrix.target }}
+    
+    # Rename to ensure all binaries have unique names
+    - name: Rename/move binary
+      run: mv target/${{ matrix.target }}/release/redwood ./${{ matrix.target }}
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.target }}
+        path: ./${{ matrix.target }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    environment: production
+
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          path: build
+
+      - name: display
+        run: ls -R
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./build/**/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+          overwrite: true
+          tag_name: ${{ github.ref_name }}
