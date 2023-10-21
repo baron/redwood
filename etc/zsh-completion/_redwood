@@ -8,25 +8,43 @@ _redwood(){
     '*::arg:->args'
 
   case $line[1] in
+    new) _rw_new ;;
     delete) _rw_delete ;;
     open) _rw_open ;;
   esac
 }
 
+_rw_new() {
+  _arguments -C \
+    "1:directories:_rw_list_bare" 
+}
+
 _rw_open() {
   _arguments -C \
-    "1:configs:_rw_worktree_configurations" 
+    "1:directories:_rw_list_repos" 
 }
 
 _rw_delete() {
   _arguments -C \
-    "1:configs:_rw_worktree_configurations" 
+    "1:directories:_rw_list_worktrees"
 }
 
-_rw_worktree_configurations(){
-  local -a configs
-  configs=(${(f)"$(_call_program redwood redwood list)"})
-  _describe 'select worktree configuration' configs
+_rw_list_repos(){
+  local -a directories
+  directories=(${(f)"$(_call_program redwood redwood list)"})
+  _describe 'select directory' directories
+}
+
+_rw_list_bare(){
+  local -a directories
+  directories=(${(f)"$(_call_program redwood redwood list --only-bare-repos)"})
+  _describe 'select directory' directories
+}
+
+_rw_list_worktrees(){
+  local -a directories
+  directories=(${(f)"$(_call_program redwood redwood list --only-worktrees)"})
+  _describe 'select directory' directories
 }
 
 _redwood "$@"

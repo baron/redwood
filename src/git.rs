@@ -7,7 +7,7 @@ use git2::{Repository as git2Repository, WorktreePruneOptions};
 
 pub trait Git {
     fn create_worktree(&self, repo_path: &Path, worktree_name: &str) -> Result<()>;
-    fn delete_worktree(&self, repo_path: &Path, worktree_name: &str) -> Result<()>;
+    fn delete_worktree(&self, worktree_path: &Path) -> Result<()>;
     fn get_repo_meta(&self, repo_path: &Path) -> Result<RepoMeta>;
 }
 
@@ -113,8 +113,10 @@ impl Git for GitImpl {
         })
     }
 
-    fn delete_worktree(&self, repo_path: &Path, worktree_name: &str) -> Result<()> {
-        let repo = GitImpl::open_repo(repo_path)?;
+    fn delete_worktree(&self, worktree_path: &Path) -> Result<()> {
+        let repo = GitImpl::open_repo(worktree_path)?;
+        let worktree_name = worktree_path.file_name().unwrap().to_str().unwrap(); // TODO: Get rid of unwraps
+
         let worktree = match repo.find_worktree(worktree_name) {
             Ok(worktree) => worktree,
             Err(e) => return Err(RedwoodError::from(e)),

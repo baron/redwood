@@ -14,32 +14,32 @@ pub enum Commands {
     /// Create new worktree
     #[clap(arg_required_else_help = true)]
     New {
+        #[clap(required = true, parse(from_os_str))]
+        repo_path: PathBuf,
         #[clap(required = true)]
         worktree_name: String,
-        #[clap(required = false, parse(from_os_str))]
-        repo_path: Option<PathBuf>,
         #[clap(long)]
         tmux_session_name: Option<String>,
     },
     /// Open existing worktree configuration
     Open {
         #[clap(required = true)]
-        identifier: String,
+        path: PathBuf,
     },
     /// Delete worktree configuration
     Delete {
         #[clap(required = true)]
-        identifier: String,
-    },
-    /// Import existing worktree
-    Import {
-        #[clap(required = true, parse(from_os_str))]
-        worktree_path: PathBuf,
-        #[clap(long)]
-        tmux_session_name: Option<String>,
+        path: PathBuf,
     },
     /// List existing worktree configurations
-    List {},
+    List {
+        /// Only list bare repositories
+        #[clap(long)]
+        only_bare_repos: bool,
+        /// Only list work trees (in bare repositories).
+        #[clap(long)]
+        only_worktrees: bool,
+    },
     /// Print version of Redwood
     Version {},
 }

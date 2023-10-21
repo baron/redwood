@@ -1,13 +1,13 @@
-use crate::conf::{Config, WorktreeConfig};
 use crate::context::Context;
 use crate::error::RedwoodError;
 use crate::Result;
 use crate::{cli, cli::Cli};
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use std::{env, fs};
 
 pub trait Command {
-    fn execute(&self, ctx: &Context, cfg: Config) -> Result<()>;
+    fn execute(&self, ctx: &Context) -> Result<()>;
 }
 
 impl std::convert::From<Cli> for Box<dyn Command> {
@@ -23,47 +23,38 @@ impl std::convert::From<Cli> for Box<dyn Command> {
                 worktree_name,
                 tmux_session_name,
             }),
-            cli::Commands::Open { identifier } => Box::new(Open { identifier }),
-            cli::Commands::Delete { identifier } => Box::new(Delete { identifier }),
-            cli::Commands::Import {
-                worktree_path,
-                tmux_session_name,
-            } => Box::new(Import {
-                worktree_path,
-                tmux_session_name,
+            cli::Commands::Open { path } => Box::new(Open { path }),
+            cli::Commands::Delete { path } => Box::new(Delete { path }),
+            cli::Commands::List {
+                only_bare_repos,
+                only_worktrees,
+            } => Box::new(List {
+                only_bare_repos,
+                only_worktrees,
             }),
-            cli::Commands::List {} => Box::new(List {}),
             cli::Commands::Version {} => Box::new(Version {}),
         }
     }
 }
 
 struct New {
-    repo_path: Option<PathBuf>,
+    repo_path: PathBuf,
     worktree_name: String,
     tmux_session_name: Option<String>,
 }
 
 impl Command for New {
-    fn execute(&self, ctx: &Context, mut cfg: Config) -> Result<()> {
-        let Context {
-            tmux,
-            git,
-            config_writer,
-        } = ctx;
-        let default_repo_path = PathBuf::from(".");
-        let repo_path = self.repo_path.as_ref().unwrap_or(&default_repo_path);
-        let repo = git.get_repo_meta(repo_path)?;
+    fn execute(&self, ctx: &Context) -> Result<()> {
+        let Context { tmux, git } = ctx;
+        let repo = git.get_repo_meta(&self.repo_path)?;
+        if !repo.is_bare() {
+            return Err(RedwoodError::NotBareRepoError {
+                repo_path: self.repo_path.to_path_buf(),
+            });
+        }
         let worktree_path = repo.root_path().join(&self.worktree_name);
 
         git.create_worktree(repo.root_path(), &self.worktree_name)?;
-
-        let mut wt_cfg = WorktreeConfig::new(&worktree_path, &self.worktree_name);
-        if let Some(tmux_session_name) = &self.tmux_session_name {
-            wt_cfg.set_tmux_session_name(tmux_session_name);
-        }
-        cfg.add_worktree(wt_cfg)?;
-        config_writer.write(&cfg)?;
 
         let session_name = self
             .tmux_session_name
@@ -78,25 +69,25 @@ impl Command for New {
 }
 
 struct Open {
-    identifier: String,
+    path: PathBuf,
 }
 
 impl Command for Open {
-    fn execute(&self, ctx: &Context, cfg: Config) -> Result<()> {
+    fn execute(&self, ctx: &Context) -> Result<()> {
         let Context { tmux, .. } = ctx;
-        let (_, worktree_cfg) = match cfg.find(&self.identifier) {
-            Some(cfg) => cfg,
-            None => {
-                return Err(RedwoodError::WorkTreeConfigNotFound {
-                    worktree_name: self.identifier.to_string(),
+
+        let normalized = match self.path.canonicalize() {
+            Ok(path) => path,
+            Err(err) => {
+                return Err(RedwoodError::PathError {
+                    path: self.path.to_path_buf(),
+                    msg: format!("failed to canonicalize: {}", err),
                 })
             }
         };
+        let session_name = normalized.iter().last().unwrap().to_str().unwrap();
 
-        let session_name = worktree_cfg
-            .tmux_session_name()
-            .unwrap_or(worktree_cfg.worktree_name());
-        tmux.new_session(session_name, Path::new(worktree_cfg.repo_path()))?;
+        tmux.new_session(session_name, &self.path)?;
         tmux.attach_to_session(session_name)?;
 
         Ok(())
@@ -104,49 +95,134 @@ impl Command for Open {
 }
 
 struct Delete {
-    identifier: String,
+    path: PathBuf,
 }
 
 impl Command for Delete {
-    fn execute(&self, ctx: &Context, mut cfg: Config) -> Result<()> {
-        let Context {
-            tmux,
-            git,
-            config_writer,
-        } = ctx;
-        let (_, worktree_cfg) = match cfg.find(&self.identifier) {
-            Some(cfg) => cfg,
-            None => {
-                return Err(RedwoodError::WorkTreeConfigNotFound {
-                    worktree_name: self.identifier.to_string(),
-                })
-            }
-        };
+    fn execute(&self, ctx: &Context) -> Result<()> {
+        let Context { tmux: _, git } = ctx;
 
-        let repo = git.get_repo_meta(Path::new(worktree_cfg.repo_path()))?;
-        if repo.is_bare() {
-            git.delete_worktree(repo.root_path(), worktree_cfg.worktree_name())?;
+        let repo = git.get_repo_meta(&self.path)?;
+
+        if !repo.is_bare() {
+            return Err(RedwoodError::NotBareRepoError {
+                repo_path: self.path.to_path_buf(),
+            });
         }
-
-        let session_name = worktree_cfg
-            .tmux_session_name()
-            .unwrap_or(worktree_cfg.worktree_name());
-        tmux.kill_session(session_name)?;
-
-        cfg.remove_worktree(&self.identifier)?;
-        config_writer.write(&cfg)?;
+        git.delete_worktree(&self.path)?;
 
         Ok(())
     }
 }
 
-struct List {}
+struct List {
+    only_bare_repos: bool,
+    only_worktrees: bool,
+}
+
+fn collect_dirs(path: &std::path::Path, ignored: &[&str]) -> Result<Vec<PathBuf>> {
+    let is_hidden = path
+        .file_name()
+        .unwrap_or(std::ffi::OsStr::new(""))
+        .to_str()
+        .unwrap_or("")
+        .starts_with('.');
+    if !path.is_dir() || path.is_symlink() || is_hidden {
+        return Ok(vec![]);
+    }
+
+    let dir = match fs::read_dir(path) {
+        Ok(dir) => dir,
+        Err(err) => {
+            if err.kind() == std::io::ErrorKind::PermissionDenied {
+                return Ok(vec![]);
+            }
+            return Err(RedwoodError::FSError {
+                path: path.to_path_buf(),
+                msg: err.to_string(),
+            });
+        }
+    };
+
+    if ignored.iter().any(|ignored_dir| {
+        path.iter()
+            .any(|p| p.to_str().unwrap_or("").starts_with(ignored_dir))
+    }) {
+        return Ok(vec![]);
+    }
+
+    let mut result: Vec<PathBuf> = vec![path.to_path_buf()];
+
+    for entry in dir {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(err) => {
+                if err.kind() == std::io::ErrorKind::PermissionDenied {
+                    continue;
+                }
+                return Err(RedwoodError::FSError {
+                    path: path.to_path_buf(),
+                    msg: err.to_string(),
+                });
+            }
+        };
+
+        let path = entry.path();
+        if path.is_dir() {
+            let res = collect_dirs(&path, ignored)?;
+            result.extend(res);
+        }
+    }
+    Ok(result)
+}
 
 impl Command for List {
-    fn execute(&self, _: &Context, cfg: Config) -> Result<()> {
-        for worktree in cfg.list().iter() {
-            println!("{}", worktree.repo_path());
-        }
+    fn execute(&self, _: &Context) -> Result<()> {
+        let home_dir = match env::var("HOME") {
+            Ok(home_dir) => home_dir,
+            Err(err) => {
+                return Err(RedwoodError::EnvironmentVariableError {
+                    var: String::from("HOME"),
+                    msg: err.to_string(),
+                })
+            }
+        };
+        let home_path = PathBuf::from(home_dir);
+
+        let ignored_dirs_var = env::var("REDWOOD_IGNORED_DIRS").unwrap_or(String::from(""));
+        let mut ignored_dirs = ignored_dirs_var
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<&str>>();
+        // bare repositories maintain a "worktrees"-directory in their root containing git info for
+        // each worktree. If we don't ignore these then we'll get duplicate entries for each
+        // worktree, e.g. <repo>/worktrees/my-worktree and <repo>/my-worktree.
+        ignored_dirs.push("worktrees");
+
+        let mut dirs = collect_dirs(&home_path, &ignored_dirs)?;
+
+        dirs = dirs
+            .into_iter()
+            // we only care about directories that are git repositories
+            .filter(|d| git2::Repository::open(d).is_ok())
+            .filter(|d| {
+                if self.only_bare_repos {
+                    git2::Repository::open(d).is_ok_and(|repo| repo.is_bare())
+                } else {
+                    true
+                }
+            })
+            .filter(|d| {
+                if self.only_worktrees {
+                    git2::Repository::open(d).is_ok_and(|repo| repo.is_worktree())
+                } else {
+                    true
+                }
+            })
+            .collect();
+
+        dirs.iter().for_each(|d| println!("{}", d.display()));
+
         Ok(())
     }
 }
@@ -154,39 +230,8 @@ impl Command for List {
 struct Version {}
 
 impl Command for Version {
-    fn execute(&self, _: &Context, _: Config) -> Result<()> {
+    fn execute(&self, _: &Context) -> Result<()> {
         println!("{} v{}", crate::PKG_NAME, crate::PKG_VERSION);
-        Ok(())
-    }
-}
-
-struct Import {
-    worktree_path: PathBuf,
-    tmux_session_name: Option<String>,
-}
-
-impl Command for Import {
-    fn execute(&self, ctx: &Context, mut cfg: Config) -> Result<()> {
-        let Context { config_writer, .. } = ctx;
-        let path = match self.worktree_path.canonicalize() {
-            Ok(path) => path,
-            Err(err) => {
-                return Err(RedwoodError::InvalidPathError {
-                    worktree_path: self.worktree_path.to_path_buf(),
-                    msg: err.to_string(),
-                })
-            }
-        };
-
-        let worktree_name = path.iter().last().unwrap().to_str().unwrap();
-
-        let mut wt_cfg = WorktreeConfig::new(&path, worktree_name);
-        if let Some(tmux_session_name) = &self.tmux_session_name {
-            wt_cfg.set_tmux_session_name(tmux_session_name);
-        }
-        cfg.add_worktree(wt_cfg)?;
-        config_writer.write(&cfg)?;
-
         Ok(())
     }
 }

@@ -12,5 +12,15 @@ sudo make install
 
 ## Configuration
 
-Redwood searches for the configuration file first at
-`XDG_CONFIG_HOME/redwood/conf.json`, then `$HOME/redwood/conf.json`.
+By default redwood will iterate over all directories in the home directory
+(except for git worktree directories) to find git repositories. Since there are
+often a lot of deeply nested folders in home directories it is recommended to
+configure redwood to ignore some folders that are not relevant and commonly
+known to be larget (e.g. `node_modules`, `cargo`, `target` etc). This can be
+done by setting the environment variable `REDWOOD_IGNORED_DIRS`, which is
+expected to be a comma-separated string where each element matches a directory
+name to ignore. For example:
+
+```shell
+export REDWOOD_IGNORED_DIRS="node_modules,target,.git,.cargo,.rustup,go"
+```
