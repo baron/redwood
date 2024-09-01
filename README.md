@@ -30,3 +30,28 @@ name to ignore. For example:
 ```shell
 export REDWOOD_IGNORED_DIRS="node_modules,target,.git,.cargo,.rustup,go"
 ```
+
+## Shell auto-completion
+
+### Zsh
+
+```shell
+make install-zsh-completions
+```
+
+### Fish
+
+Copy this to your fish config file:
+
+```fish
+# Redwood completions
+set -l rw_commands delete help list new open version
+complete -c redwood --no-files -n "not __fish_seen_subcommand_from $rw_commands"\
+	-a 'delete help list new open version'
+complete -c redwood -n "__fish_seen_subcommand_from open" \
+	-a "(redwood list)"
+complete -c redwood -n "__fish_seen_subcommand_from delete" \
+    -a "(redwood list --only-worktrees)"
+complete -c redwood -n "__fish_seen_subcommand_from new" \
+    -a "(redwood list --only-bare-repos)"
+```
