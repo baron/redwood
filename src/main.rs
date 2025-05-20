@@ -14,6 +14,7 @@ use crate::error::RedwoodError;
 use std::process::exit;
 
 use clap::Parser;
+use env_logger;
 
 const PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -21,6 +22,7 @@ const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub type Result<T> = std::result::Result<T, RedwoodError>;
 
 fn main() {
+    env_logger::init();
     let cli = Cli::parse();
 
     let tmux = tmux::new();

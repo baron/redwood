@@ -3,8 +3,14 @@ use crate::error::RedwoodError;
 use crate::Result;
 use crate::{cli, cli::Cli};
 
+use log::debug;
+
 use std::path::PathBuf;
 use std::{env, fs};
+use rayon::prelude::*;
+use std::fs::File;
+use std::io::{self, Read, Write};
+use serde_json;
 
 pub trait Command {
     fn execute(&self, ctx: &Context) -> Result<()>;
@@ -153,27 +159,52 @@ fn collect_dirs(path: &std::path::Path, ignored: &[&str]) -> Result<Vec<PathBuf>
 
     let mut result: Vec<PathBuf> = vec![path.to_path_buf()];
 
-    for entry in dir {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(err) => {
-                if err.kind() == std::io::ErrorKind::PermissionDenied {
-                    continue;
-                }
-                return Err(RedwoodError::FSError {
-                    path: path.to_path_buf(),
-                    msg: err.to_string(),
-                });
-            }
-        };
+    let entries: Vec<_> = dir.collect::<Vec<_>>().into_iter().map(|entry| entry.map_err(|err| RedwoodError::FSError {
+        path: path.to_path_buf(),
+        msg: err.to_string(),
+    })).collect::<std::result::Result<Vec<_>, RedwoodError>>()?;
 
-        let path = entry.path();
-        if path.is_dir() {
-            let res = collect_dirs(&path, ignored)?;
-            result.extend(res);
-        }
-    }
+    let subdirs: Vec<_> = entries
+        .into_par_iter()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_dirs(&path, ignored).ok()
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .collect();
+
+    result.extend(subdirs);
     Ok(result)
+}
+
+fn get_cache_path() -> PathBuf {
+    let home_dir = env::var("HOME").unwrap_or_else(|_| String::from("."));
+    PathBuf::from(home_dir).join(".redwood_cache.json")
+}
+
+fn load_cache() -> io::Result<Vec<PathBuf>> {
+    let cache_path = get_cache_path();
+    if !cache_path.exists() {
+        return Ok(vec![]);
+    }
+    let mut file = File::open(cache_path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    let paths: Vec<String> = serde_json::from_str(&contents)?;
+    Ok(paths.into_iter().map(PathBuf::from).collect())
+}
+
+fn save_cache(paths: &[PathBuf]) -> io::Result<()> {
+    let cache_path = get_cache_path();
+    let paths: Vec<String> = paths.iter().map(|p| p.to_string_lossy().into_owned()).collect();
+    let contents = serde_json::to_string(&paths)?;
+    let mut file = File::create(cache_path)?;
+    file.write_all(contents.as_bytes())?;
+    Ok(())
 }
 
 impl Command for List {
@@ -189,6 +220,8 @@ impl Command for List {
         };
         let home_path = PathBuf::from(home_dir);
 
+        debug!("redwood list: beginning scan under {:?}", home_path);
+
         let ignored_dirs_var = env::var("REDWOOD_IGNORED_DIRS").unwrap_or(String::from(""));
         let mut ignored_dirs = ignored_dirs_var
             .split(',')
@@ -199,29 +232,50 @@ impl Command for List {
         // worktree, e.g. <repo>/worktrees/my-worktree and <repo>/my-worktree.
         ignored_dirs.push("worktrees");
 
+        // Load the cache
+        let cached_dirs = load_cache().unwrap_or_else(|_| vec![]);
+        debug!("redwood list: loaded {} repositories from cache", cached_dirs.len());
+
+        // Scan the file system for new repositories
         let mut dirs = collect_dirs(&home_path, &ignored_dirs)?;
 
         dirs = dirs
             .into_iter()
-            // we only care about directories that are git repositories
-            .filter(|d| git2::Repository::open(d).is_ok())
-            .filter(|d| {
-                if self.only_bare_repos {
-                    git2::Repository::open(d).is_ok_and(|repo| repo.is_bare())
-                } else {
-                    true
-                }
-            })
-            .filter(|d| {
-                if self.only_worktrees {
-                    git2::Repository::open(d).is_ok_and(|repo| repo.is_worktree())
-                } else {
-                    true
+            .filter_map(|d| {
+                match git2::Repository::open(&d) {
+                    Ok(repo) => {
+                        // Apply optional filters
+                        if (self.only_bare_repos && !repo.is_bare())
+                            || (self.only_worktrees && !repo.is_worktree())
+                        {
+                            None
+                        } else {
+                            Some(d)
+                        }
+                    }
+                    Err(_) => None, // not a repo
                 }
             })
             .collect();
 
-        dirs.iter().for_each(|d| println!("{}", d.display()));
+        debug!("redwood list: found {} repositories after filtering", dirs.len());
+
+        // Merge cached and real-time data
+        let mut merged_dirs: Vec<PathBuf> = cached_dirs.into_iter().filter(|d| d.exists()).collect();
+        for d in dirs {
+            if !merged_dirs.contains(&d) {
+                merged_dirs.push(d);
+            }
+        }
+
+        debug!("redwood list: merged {} repositories", merged_dirs.len());
+
+        // Save the merged results to the cache
+        if let Err(e) = save_cache(&merged_dirs) {
+            eprintln!("Failed to save cache: {}", e);
+        }
+
+        merged_dirs.iter().for_each(|d| println!("{}", d.display()));
 
         Ok(())
     }
